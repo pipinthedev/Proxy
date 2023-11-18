@@ -23,13 +23,14 @@ install_3proxy() {
     mkdir -p /usr/local/etc/3proxy/bin
     mkdir -p /usr/local/etc/3proxy/logs
     mkdir -p /usr/local/etc/3proxy/stat
-    cp src/3proxy /usr/local/etc/3proxy/bin/   # <-- Change this line
+    cp src/3proxy /usr/local/etc/3proxy/bin/
     cp scripts/rc.d/proxy.sh /etc/init.d/3proxy
     chmod +x /etc/init.d/3proxy
+    update-rc.d 3proxy defaults
     systemctl enable 3proxy
+    systemctl daemon-reload
     cd $WORKDIR
 }
-
 
 gen_3proxy() {
     cat <<EOF
