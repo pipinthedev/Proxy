@@ -26,11 +26,26 @@ install_3proxy() {
     cp src/3proxy /usr/local/etc/3proxy/bin/
     cp scripts/rc.d/proxy.sh /etc/init.d/3proxy
     chmod +x /etc/init.d/3proxy
-    update-rc.d 3proxy defaults
+
+    # Create and enable systemd service
+    cat > /etc/systemd/system/3proxy.service <<EOL
+[Unit]
+Description=3proxy Proxy Server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/etc/3proxy/bin/3proxy /usr/local/etc/3proxy/3proxy.cfg
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
     systemctl enable 3proxy
     systemctl daemon-reload
     cd $WORKDIR
 }
+
 
 gen_3proxy() {
     cat <<EOF
@@ -89,7 +104,7 @@ EOF
 
 echo "installing apps"
 apt-get update
-apt-get install -y gcc net-tools bsdtar zip >/dev/null
+apt-get install -y gcc net-tools tar zip >/dev/null   # <-- Modify this line
 
 install_3proxy
 
@@ -122,8 +137,4 @@ ulimit -n 10048
 systemctl start 3proxy
 EOF
 
-bash /etc/rc.local
-
-gen_proxy_file_for_user
-
-upload_proxy
+bash
