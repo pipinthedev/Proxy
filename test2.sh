@@ -86,7 +86,7 @@ if [[ $MIN_PORT -gt $MAX_PORT ]]; then
   exit 1
 fi
 
-gen_data >$WORKDIR/proxy_list.txt
+gen_data > $WORKDIR/proxy_list.txt
 gen_squid_proxy_file_for_user
 
 configure_squid
