@@ -8,7 +8,7 @@ random() {
 install_squid() {
   echo "Installing Squid..."
   apt-get update
-  apt-get install -y squid
+  apt-get install -y squid apache2-utils
 }
 
 configure_squid() {
@@ -63,14 +63,14 @@ EOF
 
 gen_data() {
   seq $FIRST_PORT $LAST_PORT | while read port; do
-    echo "usr$(random):$(random)" >> /etc/squid/squid_passwd
-    echo "$IP4:$port"
+    user="usr$(random)"
+    pass="$(random)"
+    echo "$user:$pass" >> /etc/squid/squid_passwd
+    echo "$user:$pass@$IP4:$port"
   done
 }
 
 echo "Installing apps"
-apt-get install -y apache2-utils
-
 install_squid
 
 echo "Working folder = /home/squid-installer"
