@@ -19,6 +19,10 @@ apt-get install -y squid
 touch /etc/squid/squid_passwd
 chmod 600 /etc/squid/squid_passwd
 
+# Create a proxy information file
+PROXY_FILE=/home/proxy.txt
+echo -n > $PROXY_FILE
+
 # Generate proxy passwords and update Squid password file
 for ((i = 1; i <= NUM_PROXIES; i++)); do
     PROXY_USER="user$i"
@@ -70,9 +74,12 @@ EOL
 
     # Include the proxy configuration file in the main Squid configuration
     echo "include /etc/squid/squid_proxy_${PORT}.conf" >> /etc/squid/squid.conf
+
+    # Save proxy information to the proxy file
+    echo "${SERVER_IP}:${PORT}:${PROXY_USER}:${PROXY_PASS}" >> $PROXY_FILE
 done
 
 # Restart Squid
 systemctl restart squid
 
-echo "Squid installed and configured. Proxies are ready!"
+echo "Squid installed and configured. Proxies are ready. Proxy information saved to: $PROXY_FILE"
