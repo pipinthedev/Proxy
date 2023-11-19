@@ -44,7 +44,7 @@ http_access deny manager
 http_access allow localhost
 http_access deny all
 
-http_port $SERVER_IP:10000-11000
+http_port $SERVER_IP:10000,11000
 visible_hostname proxy-server
 
 auth_param basic program /usr/lib/squid/basic_ncsa_auth /etc/squid/squid_passwd
@@ -90,7 +90,7 @@ systemctl restart squid
 # Generate proxies and save to home/proxy.txt
 echo "Generating proxies..."
 echo -n > /home/proxy.txt
-for ((i = 10000; i <= 11000; i++)); do
+for ((i = 1000; i <= 10000; i++)); do
     echo "${SERVER_IP}:${i}:${PROXY_USER}:${PROXY_PASS}" >> /home/proxy.txt
 done
 
