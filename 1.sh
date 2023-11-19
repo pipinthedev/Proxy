@@ -7,6 +7,10 @@ read SERVER_IP
 # Get the number of proxies to generate
 read -p "Enter the number of proxies to generate: " NUM_PROXIES
 
+# Set port range for proxies
+MIN_PORT=3400
+MAX_PORT=4000
+
 # Install Squid
 apt-get update
 apt-get install -y squid
@@ -20,31 +24,11 @@ for ((i = 1; i <= NUM_PROXIES; i++)); do
     PROXY_USER="user$i"
     PROXY_PASS=$(tr -cd '[:alnum:]' < /dev/urandom | head -c10)
     htpasswd -b /etc/squid/squid_passwd $PROXY_USER $PROXY_PASS
-done
 
-# Configure Squid
-cat <<EOL > /etc/squid/squid.conf
-acl SSL_ports port 443
-acl Safe_ports port 80      # http
-acl Safe_ports port 21      # ftp
-acl Safe_ports port 443     # https
-acl Safe_ports port 70      # gopher
-acl Safe_ports port 210     # wais
-acl Safe_ports port 1025-65535  # unregistered ports
-acl Safe_ports port 280     # http-mgmt
-acl Safe_ports port 488     # gss-http
-acl Safe_ports port 591     # filemaker
-acl Safe_ports port 777     # multiling http
-acl CONNECT method CONNECT
-
-http_access deny !Safe_ports
-http_access deny CONNECT !SSL_ports
-http_access allow localhost manager
-http_access deny manager
-http_access allow localhost
-http_access deny all
-
-http_port $SERVER_IP:10000,11000
+    # Create individual configuration file for each proxy port
+    PORT=$((MIN_PORT + i - 1))
+    cat <<EOL > /etc/squid/squid_proxy_${PORT}.conf
+http_port $SERVER_IP:$PORT
 visible_hostname proxy-server
 
 auth_param basic program /usr/lib/squid/basic_ncsa_auth /etc/squid/squid_passwd
@@ -84,26 +68,11 @@ request_header_access Cookie allow all
 request_header_access All deny all
 EOL
 
-# Restart Squid
-systemctl restart squid
-
-# Generate proxies and save to home/proxy.txt
-echo "Generating proxies..."
-echo -n > /home/proxy.txt
-for ((i = 1000; i <= 10000; i++)); do
-    echo "${SERVER_IP}:${i}:${PROXY_USER}:${PROXY_PASS}" >> /home/proxy.txt
+    # Include the proxy configuration file in the main Squid configuration
+    echo "include /etc/squid/squid_proxy_${PORT}.conf" >> /etc/squid/squid.conf
 done
 
-# Check proxies by pinging google.com
-echo "Checking proxies..."
-while IFS= read -r proxy; do
-    proxy_ip=$(echo "$proxy" | cut -d':' -f1)
-    ping -c 1 -W 1 -q google.com -I $proxy_ip >/dev/null
-    if [ $? -eq 0 ]; then
-        echo "Proxy $proxy is working."
-    else
-        echo "Proxy $proxy is not working."
-    fi
-done < /home/proxy.txt
+# Restart Squid
+systemctl restart squid
 
 echo "Squid installed and configured. Proxies are ready!"
