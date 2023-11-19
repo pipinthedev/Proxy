@@ -7,10 +7,6 @@ read SERVER_IP
 # Get the number of proxies to generate
 read -p "Enter the number of proxies to generate: " NUM_PROXIES
 
-# Set port range for proxies
-MIN_PORT=3400
-MAX_PORT=4000
-
 # Install Squid
 apt-get update
 apt-get install -y squid
@@ -19,20 +15,42 @@ apt-get install -y squid
 touch /etc/squid/squid_passwd
 chmod 600 /etc/squid/squid_passwd
 
-# Create a proxy information file
-PROXY_FILE=/home/proxy.txt
-echo -n > $PROXY_FILE
-
 # Generate proxy passwords and update Squid password file
 for ((i = 1; i <= NUM_PROXIES; i++)); do
     PROXY_USER="user$i"
     PROXY_PASS=$(tr -cd '[:alnum:]' < /dev/urandom | head -c10)
     htpasswd -b /etc/squid/squid_passwd $PROXY_USER $PROXY_PASS
+done
 
-    # Create individual configuration file for each proxy port
-    PORT=$((MIN_PORT + i - 1))
-    cat <<EOL > /etc/squid/squid_proxy_${PORT}.conf
-http_port $SERVER_IP:$PORT
+# Configure Squid
+CONFIG_DIR="/etc/squid/individual_configs"
+mkdir -p $CONFIG_DIR
+
+# Create individual configuration files for each port
+for PORT in $(seq 10000 10099); do
+    INDIVIDUAL_CONFIG="$CONFIG_DIR/squid_$PORT.conf"
+    cat <<EOL >$INDIVIDUAL_CONFIG
+acl SSL_ports port 443
+acl Safe_ports port 80      # http
+acl Safe_ports port 21      # ftp
+acl Safe_ports port 443     # https
+acl Safe_ports port 70      # gopher
+acl Safe_ports port 210     # wais
+acl Safe_ports port 1025-65535  # unregistered ports
+acl Safe_ports port 280     # http-mgmt
+acl Safe_ports port 488     # gss-http
+acl Safe_ports port 591     # filemaker
+acl Safe_ports port 777     # multiling http
+acl CONNECT method CONNECT
+
+http_access deny !Safe_ports
+http_access deny CONNECT !SSL_ports
+http_access allow localhost manager
+http_access deny manager
+http_access allow localhost
+http_access deny all
+
+http_port $PORT
 visible_hostname proxy-server
 
 auth_param basic program /usr/lib/squid/basic_ncsa_auth /etc/squid/squid_passwd
@@ -71,15 +89,35 @@ request_header_access User-Agent allow all
 request_header_access Cookie allow all
 request_header_access All deny all
 EOL
-
-    # Include the proxy configuration file in the main Squid configuration
-    echo "include /etc/squid/squid_proxy_${PORT}.conf" >> /etc/squid/squid.conf
-
-    # Save proxy information to the proxy file
-    echo "${SERVER_IP}:${PORT}:${PROXY_USER}:${PROXY_PASS}" >> $PROXY_FILE
 done
+
+# Include individual configurations in the main configuration file
+MAIN_CONFIG="/etc/squid/squid.conf"
+echo "# Include individual configurations" >> $MAIN_CONFIG
+echo "include $CONFIG_DIR/squid_*.conf" >> $MAIN_CONFIG
 
 # Restart Squid
 systemctl restart squid
 
-echo "Squid installed and configured. Proxies are ready. Proxy information saved to: $PROXY_FILE"
+# Generate proxies and save to home/proxy.txt
+echo "Generating proxies..."
+echo -n > /home/proxy.txt
+for PORT in $(seq 10000 10099); do
+    for ((i = 1; i <= NUM_PROXIES; i++)); do
+        echo "${SERVER_IP}:${PORT}:user${i}:password" >> /home/proxy.txt
+    done
+done
+
+# Check proxies by pinging google.com
+echo "Checking proxies..."
+while IFS= read -r proxy; do
+    proxy_ip=$(echo "$proxy" | cut -d':' -f1)
+    ping -c 1 -W 1 -q google.com -I $proxy_ip >/dev/null
+    if [ $? -eq 0 ]; then
+        echo "Proxy $proxy is working."
+    else
+        echo "Proxy $proxy is not working."
+    fi
+done < /home/proxy.txt
+
+echo "Squid installed and configured. Proxies are ready!"
