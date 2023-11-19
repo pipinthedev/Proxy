@@ -4,11 +4,6 @@
 echo "Enter the server IP address:"
 read SERVER_IP
 
-# Get port range from user
-echo "Enter the range for the ports (e.g., 10000 to 11000)"
-read -p "Minimum port: " MIN_PORT
-read -p "Maximum port: " MAX_PORT
-
 # Get the number of proxies to generate
 read -p "Enter the number of proxies to generate: " NUM_PROXIES
 
@@ -49,7 +44,7 @@ http_access deny manager
 http_access allow localhost
 http_access deny all
 
-http_port $SERVER_IP:$MIN_PORT-$MAX_PORT
+http_port $SERVER_IP:10000-11000
 visible_hostname proxy-server
 
 auth_param basic program /usr/lib/squid/basic_ncsa_auth /etc/squid/squid_passwd
@@ -94,8 +89,9 @@ systemctl restart squid
 
 # Generate proxies and save to home/proxy.txt
 echo "Generating proxies..."
-for port in $(seq $MIN_PORT $MAX_PORT); do
-    echo "${SERVER_IP}:${port}:${PROXY_USER}:${PROXY_PASS}" >> /home/proxy.txt
+echo -n > /home/proxy.txt
+for ((i = 10000; i <= 11000; i++)); do
+    echo "${SERVER_IP}:${i}:${PROXY_USER}:${PROXY_PASS}" >> /home/proxy.txt
 done
 
 # Check proxies by pinging google.com
